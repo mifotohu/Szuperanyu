@@ -1,0 +1,7 @@
+{
+  "name": "Szuperanyu Asszisztens",
+  "description": "Egy intelligens naptárkezelő és teendőlistás alkalmazás túlterhelt anyukáknak, ami rendszerezi a kaotikus kéréseket.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
