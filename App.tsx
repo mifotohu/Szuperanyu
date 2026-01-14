@@ -5,7 +5,7 @@ import { processUserInput } from './services/geminiService';
 import TaskItem from './components/TaskItem';
 import EventItem from './components/EventItem';
 
-const STORAGE_KEY = 'supermom_v10_final';
+const STORAGE_KEY = 'supermom_v11_final';
 const GOOGLE_ACCOUNTS_KEY = 'supermom_google_accounts';
 const CLIENT_ID_KEY = 'supermom_client_id_config';
 
@@ -18,8 +18,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'chat'>('dashboard');
   const [showAccountSelector, setShowAccountSelector] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [showConfigHelp, setShowConfigHelp] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   
   // Google Client ID state with expiry logic
@@ -33,11 +32,15 @@ const App: React.FC = () => {
     // Load Client ID and check expiry
     const savedConfig = localStorage.getItem(CLIENT_ID_KEY);
     if (savedConfig) {
-      const { value, expiry } = JSON.parse(savedConfig);
-      if (Date.now() < expiry) {
-        setClientId(value);
-        setClientIdExpiry(expiry);
-      } else {
+      try {
+        const { value, expiry } = JSON.parse(savedConfig);
+        if (Date.now() < expiry) {
+          setClientId(value);
+          setClientIdExpiry(expiry);
+        } else {
+          localStorage.removeItem(CLIENT_ID_KEY);
+        }
+      } catch (e) {
         localStorage.removeItem(CLIENT_ID_KEY);
       }
     }
@@ -63,7 +66,7 @@ const App: React.FC = () => {
 
     setMessages([{
       role: 'assistant',
-      content: 'Szia! Szuperanyu asszisztens készen áll. Beállítottad már a Google naptár kapcsolatot a jobb felső sarokban? ✨',
+      content: 'Szia! Szuperanyu asszisztens készen áll. Ha szeretnéd a Google Naptáradat is használni, ne felejtsd el beírni a kódot a felső mezőbe! ✨',
       timestamp: Date.now()
     }]);
   }, []);
@@ -75,6 +78,13 @@ const App: React.FC = () => {
     localStorage.setItem(CLIENT_ID_KEY, JSON.stringify({ value: id, expiry }));
   };
 
+  const getTimeRemaining = () => {
+    if (!clientIdExpiry) return null;
+    const diff = clientIdExpiry - Date.now();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    return `${hours} óra`;
+  };
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, events }));
   }, [tasks, events]);
@@ -82,6 +92,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(GOOGLE_ACCOUNTS_KEY, JSON.stringify(googleAccounts));
   }, [googleAccounts]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleSendMessage = async (text?: string) => {
     const msg = text || inputValue;
@@ -124,7 +138,7 @@ const App: React.FC = () => {
 
   const addNewGoogleAccount = () => {
     if (!clientId) {
-      setShowSettings(true);
+      alert("Kérlek, előbb add meg a Google kódot a felső mezőben!");
       return;
     }
 
@@ -146,7 +160,7 @@ const App: React.FC = () => {
       });
       client.requestAccessToken();
     } catch (e) {
-      alert("Hiba történt a bejelentkezéskor. Ellenőrizd a kódot!");
+      alert("Hiba a csatlakozáskor. Ellenőrizd a kódot!");
       console.error(e);
     }
   };
@@ -191,25 +205,67 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto min-h-screen bg-[#fdf2f8] flex flex-col shadow-2xl relative overflow-hidden">
+      {/* Top Google Config Bar */}
+      <div className="bg-white border-b border-pink-100 p-3 shadow-sm z-[60]">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 relative">
+            <input 
+              type="password"
+              value={clientId}
+              onChange={(e) => saveClientId(e.target.value)}
+              placeholder="Google Client ID (pl. 23498...)"
+              className="w-full text-[10px] p-2 pl-3 rounded-xl bg-pink-50/30 border border-pink-100 focus:outline-none focus:ring-1 focus:ring-pink-300 placeholder-pink-200 font-medium"
+            />
+            {clientId && (
+              <span className="absolute right-2 top-1.5 text-[8px] font-bold text-green-500 bg-white px-1 rounded shadow-sm">
+                Mentve: {getTimeRemaining()}
+              </span>
+            )}
+          </div>
+          <button 
+            onClick={() => setShowConfigHelp(!showConfigHelp)}
+            className="w-8 h-8 rounded-xl bg-pink-100 text-pink-500 flex items-center justify-center hover:bg-pink-200 transition-colors"
+            title="Segítség a kód megszerzéséhez"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </button>
+        </div>
+        
+        {/* Help Tooltip Content */}
+        {showConfigHelp && (
+          <div className="mt-2 p-3 bg-white rounded-xl border border-pink-100 shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
+            <h4 className="text-[10px] font-black text-gray-800 uppercase mb-2 tracking-wider">Hogyan szerezzek kódot?</h4>
+            <div className="text-[9px] text-gray-600 space-y-1.5 leading-relaxed">
+              <p>1. Lépj be a <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-pink-500 underline font-bold">Google Cloud Console</a> oldalra.</p>
+              <p>2. Hozz létre egy új projektet (pl. "Szuperanyu").</p>
+              <p>3. Kapcsold be a <b>Google Calendar API</b>-t.</p>
+              <p>4. Hozz létre egy <b>OAuth Client ID</b>-t (Web Application).</p>
+              <p>5. Az 'Authorized JavaScript Origins' mezőbe add meg az oldal címét.</p>
+              <p className="p-1.5 bg-pink-50 text-pink-500 rounded-lg font-bold border border-pink-100 italic">
+                A kód biztonsági okokból 24 óra után automatikusan törlődik a böngésződből!
+              </p>
+            </div>
+            <button 
+              onClick={() => setShowConfigHelp(false)}
+              className="mt-3 w-full py-1 text-[9px] font-black text-gray-400 hover:text-gray-600"
+            >
+              Értem, köszönöm!
+            </button>
+          </div>
+        )}
+      </div>
+
       <header className="bg-white/95 backdrop-blur-md p-4 border-b border-pink-100 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <div className="bg-pink-500 w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-lg">🤱</div>
           <div>
             <h1 className="font-black text-gray-800 text-xs uppercase tracking-tight">Szuperanyu</h1>
-            <p className="text-[8px] text-pink-400 font-bold uppercase tracking-widest">Premium Assistant</p>
+            <p className="text-[8px] text-pink-400 font-bold uppercase tracking-widest">Digital Assistant</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setShowSettings(true)}
-            className={`p-2 rounded-full transition-all ${clientId ? 'bg-green-50 text-green-500' : 'bg-pink-50 text-pink-400'}`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-          </button>
-          <div className="flex gap-1 bg-pink-50 p-1 rounded-2xl">
-            <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${activeTab === 'dashboard' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'}`}>LISTA</button>
-            <button onClick={() => setActiveTab('chat')} className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${activeTab === 'chat' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'}`}>CHAT</button>
-          </div>
+        <div className="flex gap-1 bg-pink-50 p-1 rounded-2xl">
+          <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${activeTab === 'dashboard' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'}`}>LISTA</button>
+          <button onClick={() => setActiveTab('chat')} className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${activeTab === 'chat' ? 'bg-white text-pink-600 shadow-sm' : 'text-pink-300'}`}>CHAT</button>
         </div>
       </header>
 
@@ -238,7 +294,7 @@ const App: React.FC = () => {
                 </div>
               </div>
             ))}
-            {isLoading && <div className="text-[10px] font-black text-pink-300 animate-pulse uppercase tracking-widest ml-2">Dolgozom... ✨</div>}
+            {isLoading && <div className="text-[10px] font-black text-pink-300 animate-pulse uppercase tracking-widest ml-2">Szuperanyu dolgozik... ✨</div>}
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -248,68 +304,12 @@ const App: React.FC = () => {
       {activeTab === 'dashboard' && (tasks.length > 0 || events.length > 0) && (
         <div className="fixed bottom-24 left-0 right-0 max-w-md mx-auto px-6 pointer-events-none">
           <button 
-            onClick={() => clientId ? setShowAccountSelector(true) : setShowSettings(true)}
+            onClick={() => clientId ? setShowAccountSelector(true) : alert("Kérlek add meg a kódot felül!")}
             disabled={isExporting}
-            className="w-full bg-white border-2 border-pink-100 text-gray-700 py-4 rounded-3xl shadow-2xl flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-wider pointer-events-auto active:scale-95 transition-all"
+            className={`w-full py-4 rounded-3xl shadow-2xl flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-wider pointer-events-auto active:scale-95 transition-all ${clientId ? 'bg-white border-2 border-pink-100 text-gray-700' : 'bg-pink-100 text-pink-300 cursor-not-allowed opacity-50'}`}
           >
             {isExporting ? "Szinkronizálás..." : "Mentés Google Naptárba"}
           </button>
-        </div>
-      )}
-
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">⚙️</div>
-              <h3 className="text-xl font-black text-gray-800">Google Integráció</h3>
-              <p className="text-xs text-pink-400 mt-1 uppercase font-bold tracking-widest">Szuperanyu Beállítások</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="relative">
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1 block">Google Client ID (Kód)</label>
-                <input 
-                  type="password"
-                  value={clientId}
-                  onChange={(e) => saveClientId(e.target.value)}
-                  placeholder="23498...-apps.googleusercontent.com"
-                  className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 text-xs focus:ring-2 focus:ring-pink-200 outline-none"
-                />
-                {clientIdExpiry && (
-                  <p className="text-[9px] text-orange-400 font-bold mt-2 ml-1">
-                    🕒 Biztonsági törlés: {new Date(clientIdExpiry).toLocaleTimeString('hu-HU')}
-                  </p>
-                )}
-              </div>
-
-              <button 
-                onClick={() => setShowTooltip(!showTooltip)}
-                className="w-full py-3 text-[10px] font-black text-pink-500 uppercase flex items-center justify-center gap-2 hover:bg-pink-50 rounded-xl transition-all"
-              >
-                {showTooltip ? "Bezárás" : "❓ Hogyan szerezzek ilyen kódot?"}
-              </button>
-
-              {showTooltip && (
-                <div className="p-4 bg-pink-50 rounded-2xl border border-pink-100 text-[10px] text-gray-600 leading-relaxed space-y-2 animate-in slide-in-from-top-4">
-                  <p>1. Menj a <b>Google Cloud Console</b> oldalra.</p>
-                  <p>2. Hozz létre egy új projektet: "Szuperanyu".</p>
-                  <p>3. Kapcsold be a <b>Google Calendar API</b>-t.</p>
-                  <p>4. Hozz létre egy <b>OAuth Client ID</b>-t (Web Application).</p>
-                  <p>5. Másold be ide a kapott hosszú kódot.</p>
-                  <p className="italic text-pink-400">A kód 24 óráig marad meg a böngésződben.</p>
-                </div>
-              )}
-            </div>
-
-            <button 
-              onClick={() => setShowSettings(false)}
-              className="w-full mt-8 bg-gray-800 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-colors"
-            >
-              Kész, mehetünk!
-            </button>
-          </div>
         </div>
       )}
 
