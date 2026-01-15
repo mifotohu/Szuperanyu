@@ -2,7 +2,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GeminiResponse } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Safe access to process.env to prevent ReferenceError in production
+const getApiKey = () => {
+  try {
+    return (typeof process !== 'undefined' && process.env.API_KEY) ? process.env.API_KEY : "";
+  } catch (e) {
+    return "";
+  }
+};
+
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 const getTodayISO = () => new Date().toISOString().split('T')[0];
 const getWeekday = () => new Intl.DateTimeFormat('hu-HU', { weekday: 'long' }).format(new Date());
