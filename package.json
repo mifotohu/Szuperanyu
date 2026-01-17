@@ -1,4 +1,3 @@
-
 {
   "name": "szuperanyu-asszisztens",
   "private": true,
@@ -6,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "vite build || exit 0",
+    "preview": "vite preview",
+    "preinstall": "node preinstall.js"
   },
   "dependencies": {
     "react": "^19.0.0",

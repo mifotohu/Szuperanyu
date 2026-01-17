@@ -3,14 +3,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { GeminiResponse } from "../types";
 
 // The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-const API_KEY = process.env.API_KEY || "";
-
-// Initialize AI lazily or handle empty key gracefully
-const getAI = () => {
-  if (!API_KEY) {
-    console.warn("API_KEY is missing. Szuperanyu needs a key to work! 🌸");
-  }
-  return new GoogleGenAI({ apiKey: API_KEY });
+const getApiKey = () => {
+  return process.env.API_KEY || "";
 };
 
 const getTodayISO = () => new Date().toISOString().split('T')[0];
@@ -38,15 +32,17 @@ VÁLASZ: Csak JSON, magyar textResponse-szal. Használj sok kedves emojit! 🌸�
 `;
 
 export const processUserInput = async (input: string, context?: string): Promise<GeminiResponse> => {
-  if (!API_KEY) {
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
     return {
       type: 'clarification',
-      textResponse: "Szia! Úgy tűnik, még nem kaptam meg a titkos kulcsomat a működéshez (API_KEY hiányzik). Kérlek, szólj a fejlesztőnek! 🌸"
+      textResponse: "Szia! Úgy tűnik, hiányzik az API kulcs (process.env.API_KEY) a működéshez. Kérlek, ellenőrizd a környezeti változókat! 🌸"
     };
   }
 
   try {
-    const ai = getAI();
+    const ai = new GoogleGenAI({ apiKey });
     const fullPrompt = context ? `KONTEXTUS: ${context}\n\nKÉRÉS: ${input}` : input;
     
     const response = await ai.models.generateContent({
